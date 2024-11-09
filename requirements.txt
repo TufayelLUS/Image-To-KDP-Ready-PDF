@@ -1,0 +1,6 @@
+customtkinter
+python-docx
+pillow
+docx2pdf
+reportlab
+lxml
