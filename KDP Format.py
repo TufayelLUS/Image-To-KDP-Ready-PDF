@@ -109,6 +109,30 @@ class ImageDocxApp(ctk.CTk):
         ctk.CTkLabel(self, text="Page Size (inches):").grid(
             row=4, column=0, columnspan=2, padx=10, pady=(20, 5))
 
+        # Common KDP sizes
+        self.book_size = StringVar(value='8.5 x 11 in')
+        self.common_sizes = [
+            "5 x 8 in",
+            "5.25 x 8 in",
+            "5.5 x 8.5 in",
+            "6 x 9 in",
+            "5.06 x 7.81 in",
+            "6.14 x 9.21 in",
+            "6.69 x 9.61 in",
+            "7 x 10 in",
+            "7.44 x 9.69 in",
+            "7.5 x 9.25 in",
+            "8 x 10 in",
+            "8.5 x 11 in",
+            "8.27 x 11.69 in",
+            "8.25 x 6 in",
+            "8.25 x 8.25 in",
+            "8.5 x 8.5 in"
+        ]
+        self.book_size_option = ctk.CTkOptionMenu(
+            self, values=self.common_sizes, variable=self.book_size, command=self.update_size_on_change)
+        self.book_size_option.grid(row=5, column=2, padx=10, pady=2)
+
         # Width and height with labels
         ctk.CTkLabel(self, text="Page Width:").grid(
             row=5, column=0, padx=10, pady=2, sticky="w")
@@ -168,6 +192,18 @@ class ImageDocxApp(ctk.CTk):
             self, text="Create Document", command=self.document_creator_thread, width=200)
         self.create_doc_btn.grid(row=13, column=1, pady=20)
 
+    def update_size_on_change(self, item):
+        if self.bleed_mode.get() == "Bleed":
+            width, height = item.split(" x ")
+            height = height.replace(" in", "")
+            self.page_width.set(float(width)+0.125)
+            self.page_height.set(float(height)+0.25)
+        else:
+            width, height = item.split(" x ")
+            height = height.replace(" in", "")
+            self.page_width.set(float(width))
+            self.page_height.set(float(height))
+
     def update_keep_docx_visibility(self, *args):
         if self.file_type.get() == "PDF":
             self.keep_docx_checkbox.grid(
@@ -224,17 +260,19 @@ class ImageDocxApp(ctk.CTk):
         section.page_height = Inches(self.page_height.get())
         section.top_margin = Inches(self.top_margin.get())
         section.bottom_margin = Inches(self.bottom_margin.get())
-        section.left_margin = Inches(self.left_margin.get()) # left is inside margin
-        section.right_margin = Inches(self.right_margin.get()) # right is outside margin
+        section.left_margin = Inches(
+            self.left_margin.get())  # left is inside margin
+        section.right_margin = Inches(
+            self.right_margin.get())  # right is outside margin
         section.gutter = Inches(self.gutter.get())
 
         page_width, page_height = section.page_width, section.page_height
         image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
             ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
         # sort images based on numbering
-        image_files = sorted(image_files, key=lambda x: int(x.split(' ')[-1].split('.')[0]))
+        image_files = sorted(image_files, key=lambda x: int(
+            x.split(' ')[-1].split('.')[0]))
         # print(image_files)
-        
 
         if self.bleed_mode.get() == "Bleed":
             print("Bleed mode")

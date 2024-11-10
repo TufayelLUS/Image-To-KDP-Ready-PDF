@@ -4,3 +4,4 @@ pillow
 docx2pdf
 reportlab
 lxml
+cx_freeze
