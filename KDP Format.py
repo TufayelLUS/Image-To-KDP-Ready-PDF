@@ -1,10 +1,9 @@
 import os
 import configparser
-from tkinter import filedialog, StringVar, DoubleVar, messagebox
+from tkinter import filedialog, StringVar, DoubleVar, messagebox, Listbox
 import customtkinter as ctk
 from docx import Document
 from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
 from docx.shared import Inches
 from PIL import Image
 from docx2pdf import convert
@@ -46,7 +45,7 @@ class ImageDocxApp(ctk.CTk):
         # Set window properties
         self.title("KDP Auto Formatting Tool - For Sangi")
         self.iconbitmap("icon.ico")
-        self.geometry("800x600")
+        self.geometry("1000x650")
         self.resizable(False, False)  # Make window non-resizable
 
         # Grid layout settings
@@ -80,7 +79,7 @@ class ImageDocxApp(ctk.CTk):
             self, textvariable=self.input_folder, width=300)
         self.folder_entry.grid(row=0, column=1, padx=10, pady=(20, 5))
         self.select_folder_btn = ctk.CTkButton(
-            self, text="Browse", command=self.select_folder)
+            self, text="Browse", command=self.select_folder, fg_color="#71198c")
         self.select_folder_btn.grid(row=0, column=2, padx=10, pady=(20, 5))
 
         # Output filename
@@ -108,6 +107,10 @@ class ImageDocxApp(ctk.CTk):
         # Page size label
         ctk.CTkLabel(self, text="Page Size (inches):").grid(
             row=4, column=0, columnspan=2, padx=10, pady=(20, 5))
+
+        book_size_label = ctk.CTkLabel(
+            self, text="KDP Size Template:")
+        book_size_label.grid(row=4, column=2, padx=10, pady=2)
 
         # Common KDP sizes
         self.book_size = StringVar(value='8.5 x 11 in')
@@ -189,8 +192,102 @@ class ImageDocxApp(ctk.CTk):
 
         # Create document button
         self.create_doc_btn = ctk.CTkButton(
-            self, text="Create Document", command=self.document_creator_thread, width=200)
+            self, text="Create Document", command=self.document_creator_thread, width=200, fg_color="#4a7a25")
         self.create_doc_btn.grid(row=13, column=1, pady=20)
+
+        self.image_files = []
+
+        self.image_listbox_label = ctk.CTkLabel(
+            self, text="Page Serial(Click to select):")
+        self.image_listbox_label.grid(row=6, column=2, padx=10, pady=10)
+
+        # Image List Column (New)
+        #  show vertical scrollbar
+        self.image_listbox = Listbox(
+            self, selectmode="single", height=15, exportselection=False, font=("Arial", 12))
+        self.image_listbox.grid(row=7, column=2, rowspan=5, padx=10, pady=10)
+        self.image_listbox.bind("<<ListboxSelect>>", self.update_preview)
+
+        self.up_button = ctk.CTkButton(
+            self, text="Move Page Up", command=self.move_up)
+        self.up_button.grid(row=12, column=2, padx=5, pady=5)
+
+        self.down_button = ctk.CTkButton(
+            self, text="Move Page Down", command=self.move_down)
+        self.down_button.grid(row=13, column=2, padx=5, pady=5)
+
+        # Preview window (New)
+        self.preview_label = ctk.CTkLabel(self, text="Image Preview:")
+        self.preview_label.grid(row=5, column=4, padx=10, pady=10)
+
+        self.preview_canvas = ctk.CTkLabel(
+            self, text="", width=200)
+        self.preview_canvas.grid(row=6, column=4, rowspan=5, padx=10, pady=10)
+        folder_path = self.input_folder.get()
+        if os.path.exists(folder_path):
+            self.image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
+                ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
+
+            self.image_files = sorted(self.image_files, key=lambda x: float(
+                x.split(' ')[-1].split('.')[0].replace('-', '.')))
+
+        # Load images from folder
+        self.update_image_list()
+
+    def select_folder(self):
+        folder_selected = filedialog.askdirectory()
+        if folder_selected:
+            self.input_folder.set(folder_selected)
+            folder_path = self.input_folder.get()
+            if os.path.exists(folder_path):
+                self.image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
+                    ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
+
+                self.image_files = sorted(self.image_files, key=lambda x: float(
+                    x.split(' ')[-1].split('.')[0].replace('-', '.')))
+            self.update_image_list()
+
+    def update_image_list(self):
+        folder_path = self.input_folder.get()
+        if not os.path.exists(folder_path):
+            return
+
+        self.image_listbox.delete(0, "end")
+        for img in self.image_files:
+            self.image_listbox.insert("end", img)
+
+    def update_preview(self, event=None):
+        selection = self.image_listbox.curselection()
+        if selection:
+            img_path = os.path.join(
+                self.input_folder.get(), self.image_files[selection[0]])
+            image = Image.open(img_path)
+            image.thumbnail((200, 200))
+            self.preview_img = ctk.CTkImage(
+                light_image=image, dark_image=image, size=(200, 200))
+            self.preview_canvas.configure(image=self.preview_img)
+
+    def move_up(self):
+        selection = self.image_listbox.curselection()
+        if selection and selection[0] > 0:
+            index = selection[0]
+            self.image_files[index], self.image_files[index -
+                                                      1] = self.image_files[index - 1], self.image_files[index]
+            self.update_listbox_selection(index - 1)
+
+    def move_down(self):
+        selection = self.image_listbox.curselection()
+        if selection and selection[0] < len(self.image_files) - 1:
+            index = selection[0]
+            self.image_files[index], self.image_files[index +
+                                                      1] = self.image_files[index + 1], self.image_files[index]
+            self.update_listbox_selection(index + 1)
+
+    def update_listbox_selection(self, new_index):
+        self.update_image_list()
+        self.image_listbox.select_set(new_index)
+        self.image_listbox.activate(new_index)
+        self.update_preview()
 
     def update_size_on_change(self, item):
         if self.bleed_mode.get() == "Bleed":
@@ -210,11 +307,6 @@ class ImageDocxApp(ctk.CTk):
                 row=3, column=0, padx=10, pady=5, sticky="w")
         else:
             self.keep_docx_checkbox.grid_forget()  # Hides the checkbox
-
-    def select_folder(self):
-        folder_selected = filedialog.askdirectory()
-        if folder_selected:
-            self.input_folder.set(folder_selected)
 
     def save_config(self):
         config['Settings']['input_folder'] = self.input_folder.get()
@@ -267,12 +359,12 @@ class ImageDocxApp(ctk.CTk):
         section.gutter = Inches(self.gutter.get())
 
         page_width, page_height = section.page_width, section.page_height
-        image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
-            ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
-        # sort images based on numbering
-        image_files = sorted(image_files, key=lambda x: float(
-            x.split(' ')[-1].split('.')[0].replace('-', '.')))
-        # print(image_files)
+        # self.image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
+        #     ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
+        # # sort images based on numbering
+        # self.image_files = sorted(self.image_files, key=lambda x: float(
+        #     x.split(' ')[-1].split('.')[0].replace('-', '.')))
+        # # print(self.image_files)
 
         if self.bleed_mode.get() == "Bleed":
             print("Bleed mode")
@@ -290,7 +382,7 @@ class ImageDocxApp(ctk.CTk):
                 section.bottom_margin - section.gutter
 
         # Check if there are no images to process
-        if not image_files:
+        if not self.image_files:
             messagebox.showwarning(
                 "No Images Found", "No image files found in the selected folder.")
             self.create_doc_btn.configure(
@@ -309,23 +401,30 @@ class ImageDocxApp(ctk.CTk):
 
         target_ppi = 330
 
-        for idx, filename in enumerate(image_files):
-            file_path = os.path.join(folder_path, filename)
-            image = Image.open(file_path)
+        for idx, filename in enumerate(self.image_files):
+            for _try in range(3):
+                try:
+                    file_path = os.path.join(folder_path, filename)
+                    image = Image.open(file_path)
 
-            # Ensure image has content before proceeding
-            if image.size[0] == 0 or image.size[1] == 0:
-                continue  # Skip blank images
+                    # Ensure image has content before proceeding
+                    if image.size[0] == 0 or image.size[1] == 0:
+                        continue  # Skip blank images
 
-            resized_image = image.resize((int(page_width.pt * target_ppi / 72), int(
-                page_height.pt * target_ppi / 72)), Image.LANCZOS)  # Resize for 300 PPI
+                    resized_image = image.resize((int(page_width.pt * target_ppi / 72), int(
+                        page_height.pt * target_ppi / 72)), Image.LANCZOS)  # Resize for 300 PPI
 
-            temp_image_path = os.path.join(folder_path, f'temp_{filename}')
-            resized_image.save(temp_image_path, format='PNG')
+                    temp_image_path = os.path.join(
+                        folder_path, f'temp_{filename}')
+                    resized_image.save(temp_image_path, format='PNG')
 
-            # Add image to the document
-            doc.add_picture(temp_image_path, width=available_width,
-                            height=available_height)
+                    # Add image to the document
+                    doc.add_picture(temp_image_path, width=available_width,
+                                    height=available_height)
+                    break
+                except:
+                    pass
+
             pdf_canvas.drawImage(temp_image_path, 0, 0, width=int(
                 page_width.pt), height=int(page_height.pt))
             any_images_added = True  # Mark that an image has been added
