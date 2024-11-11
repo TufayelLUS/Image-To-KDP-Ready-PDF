@@ -270,8 +270,8 @@ class ImageDocxApp(ctk.CTk):
         image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
             ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
         # sort images based on numbering
-        image_files = sorted(image_files, key=lambda x: int(
-            x.split(' ')[-1].split('.')[0]))
+        image_files = sorted(image_files, key=lambda x: float(
+            x.split(' ')[-1].split('.')[0].replace('-', '.')))
         # print(image_files)
 
         if self.bleed_mode.get() == "Bleed":
