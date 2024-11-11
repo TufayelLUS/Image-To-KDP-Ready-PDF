@@ -199,13 +199,18 @@ class ImageDocxApp(ctk.CTk):
 
         self.image_listbox_label = ctk.CTkLabel(
             self, text="Page Serial(Click to select):")
-        self.image_listbox_label.grid(row=6, column=2, padx=10, pady=10)
+        self.image_listbox_label.grid(row=6, column=2, pady=10)
 
         # Image List Column (New)
         #  show vertical scrollbar
         self.image_listbox = Listbox(
-            self, selectmode="single", height=15, exportselection=False, font=("Arial", 12))
-        self.image_listbox.grid(row=7, column=2, rowspan=5, padx=10, pady=10)
+            self, selectmode="single", height=15, exportselection=False, font=("Arial", 12), background="#242424", foreground="#ffffff", activestyle="dotbox", selectbackground="#1f6aa5", selectforeground="#ffffff")
+        self.scrollbar = ctk.CTkScrollbar(
+            self, orientation="vertical", command=self.image_listbox.yview)
+        self.image_listbox.config(yscrollcommand=self.scrollbar.set)
+        self.image_listbox.grid(row=7, column=2, rowspan=5, pady=10)
+        self.scrollbar.grid(row=7, column=3, rowspan=5,
+                            pady=10, sticky="ns")
         self.image_listbox.bind("<<ListboxSelect>>", self.update_preview)
 
         self.up_button = ctk.CTkButton(
@@ -233,6 +238,14 @@ class ImageDocxApp(ctk.CTk):
 
         # Load images from folder
         self.update_image_list()
+
+    def update_selection_view(self):
+        # Get the index of the selected item
+        selected_index = self.image_listbox.curselection()
+        if selected_index:
+            # Scroll to the selected item
+            self.image_listbox.yview_moveto(
+                selected_index[0] / float(self.image_listbox.size()))
 
     def select_folder(self):
         folder_selected = filedialog.askdirectory()
@@ -274,6 +287,7 @@ class ImageDocxApp(ctk.CTk):
             self.image_files[index], self.image_files[index -
                                                       1] = self.image_files[index - 1], self.image_files[index]
             self.update_listbox_selection(index - 1)
+            self.update_selection_view()
 
     def move_down(self):
         selection = self.image_listbox.curselection()
@@ -282,6 +296,7 @@ class ImageDocxApp(ctk.CTk):
             self.image_files[index], self.image_files[index +
                                                       1] = self.image_files[index + 1], self.image_files[index]
             self.update_listbox_selection(index + 1)
+            self.update_selection_view()
 
     def update_listbox_selection(self, new_index):
         self.update_image_list()
