@@ -41,7 +41,7 @@ ctk.set_default_color_theme("blue")
 class DraggableListbox(Listbox):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         self.bind("<Button-1>", self.select_item)
         self.bind("<B1-Motion>", self.drag_item)
 
@@ -247,7 +247,7 @@ class ImageDocxApp(ctk.CTk):
         # Image List Column (New)
         #  show vertical scrollbar
         self.image_listbox = DraggableListbox(
-            self, selectmode="single", height=15, exportselection=False, font=("Arial", 12), background="#242424", foreground="#ffffff", activestyle="dotbox", selectbackground="#1f6aa5", selectforeground="#ffffff")
+            self, selectmode="single", height=15, exportselection=False, font=("Arial", 12), background="#343638", foreground="#ffffff", activestyle="dotbox", selectbackground="#1f6aa5", selectforeground="#ffffff")
         self.scrollbar = ctk.CTkScrollbar(
             self, orientation="vertical", command=self.image_listbox.yview)
         self.image_listbox.config(yscrollcommand=self.scrollbar.set)
@@ -275,9 +275,11 @@ class ImageDocxApp(ctk.CTk):
         if os.path.exists(folder_path):
             self.image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
                 ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
-
-            self.image_files = sorted(self.image_files, key=lambda x: float(
-                x.split(' ')[-1].split('.')[0].replace('-', '.')))
+            try:
+                self.image_files = sorted(self.image_files, key=lambda x: float(
+                    x.split(' ')[-1].split('.')[0].replace('-', '.')))
+            except:
+                pass
 
         # Load images from folder
         self.update_image_list()
@@ -298,9 +300,11 @@ class ImageDocxApp(ctk.CTk):
             if os.path.exists(folder_path):
                 self.image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
                     ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
-
-                self.image_files = sorted(self.image_files, key=lambda x: float(
-                    x.split(' ')[-1].split('.')[0].replace('-', '.')))
+                try:
+                    self.image_files = sorted(self.image_files, key=lambda x: float(
+                        x.split(' ')[-1].split('.')[0].replace('-', '.')))
+                except:
+                    pass
             self.update_image_list()
 
     def update_image_list(self):
@@ -417,12 +421,7 @@ class ImageDocxApp(ctk.CTk):
         section.gutter = Inches(self.gutter.get())
 
         page_width, page_height = section.page_width, section.page_height
-        # self.image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
-        #     ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
-        # # sort images based on numbering
-        # self.image_files = sorted(self.image_files, key=lambda x: float(
-        #     x.split(' ')[-1].split('.')[0].replace('-', '.')))
-        # # print(self.image_files)
+
 
         if self.bleed_mode.get() == "Bleed":
             print("Bleed mode")
