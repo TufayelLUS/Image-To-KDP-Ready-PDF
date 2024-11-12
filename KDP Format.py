@@ -256,13 +256,23 @@ class ImageDocxApp(ctk.CTk):
                             pady=10, sticky="ns")
         self.image_listbox.bind("<<ListboxSelect>>", self.update_preview)
 
+        self.deleted_items = []  # To store deleted items
+
+        self.delete_button = ctk.CTkButton(
+            self, text="Delete Selected Page", command=self.delete_item, fg_color="#c73126")
+        self.delete_button.grid(row=12, column=2, padx=5, pady=5)
+
+        self.undo_button = ctk.CTkButton(
+            self, text="Undo Delete", command=self.undo_delete, fg_color="#96156d")
+        self.undo_button.grid(row=13, column=2, padx=1, pady=1)
+
         self.up_button = ctk.CTkButton(
             self, text="Move Page Up", command=self.move_up)
-        self.up_button.grid(row=12, column=2, padx=5, pady=5)
+        self.up_button.grid(row=12, column=4, padx=5, pady=5)
 
         self.down_button = ctk.CTkButton(
             self, text="Move Page Down", command=self.move_down)
-        self.down_button.grid(row=13, column=2, padx=5, pady=5)
+        self.down_button.grid(row=13, column=4, padx=5, pady=5)
 
         # Preview window (New)
         self.preview_label = ctk.CTkLabel(self, text="Image Preview:")
@@ -283,6 +293,23 @@ class ImageDocxApp(ctk.CTk):
 
         # Load images from folder
         self.update_image_list()
+
+    def delete_item(self):
+        selected_item_index = self.image_listbox.curselection()
+        if selected_item_index:
+            selected_item_index = selected_item_index[0]  # Get the index
+            selected_item = self.image_listbox.get(selected_item_index)
+            # Store both item and index
+            self.deleted_items.append((selected_item, selected_item_index))
+            self.image_listbox.delete(selected_item_index)
+
+    def undo_delete(self):
+        if self.deleted_items:
+            # Get last deleted item and its index
+            last_deleted_item, index = self.deleted_items.pop()
+            # Restore at the same position
+            self.image_listbox.insert(index, last_deleted_item)
+            self.image_listbox.select_set(index)  # Restore selection
 
     def update_selection_view(self):
         # Get the index of the selected item
@@ -421,7 +448,6 @@ class ImageDocxApp(ctk.CTk):
         section.gutter = Inches(self.gutter.get())
 
         page_width, page_height = section.page_width, section.page_height
-
 
         if self.bleed_mode.get() == "Bleed":
             print("Bleed mode")
