@@ -38,6 +38,49 @@ ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
 
+class DraggableListbox(Listbox):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self.bind("<Button-1>", self.select_item)
+        self.bind("<B1-Motion>", self.drag_item)
+
+        # Track the index of the item being moved
+        self.dragged_index = None
+
+    def select_item(self, event):
+        # Get the index of the item clicked
+        self.dragged_index = self.nearest(event.y)
+        # Highlight the item
+        self.selection_clear(0, ctk.END)
+        self.selection_set(self.dragged_index)
+
+    def drag_item(self, event):
+        if self.dragged_index is None:
+            return
+
+        # Get the current target index
+        target_index = self.nearest(event.y)
+
+        if target_index != self.dragged_index:
+            # Swap the items
+            dragged_text = self.get(self.dragged_index)
+            target_text = self.get(target_index)
+
+            # Delete and insert at new positions
+            self.delete(self.dragged_index)
+            self.insert(self.dragged_index, target_text)
+            self.delete(target_index)
+            self.insert(target_index, dragged_text)
+
+            # Keep the dragged item highlighted
+            self.selection_clear(0, ctk.END)
+            self.selection_set(target_index)
+
+            # Update the dragged index to the new position
+            self.dragged_index = target_index
+
+
 class ImageDocxApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -203,7 +246,7 @@ class ImageDocxApp(ctk.CTk):
 
         # Image List Column (New)
         #  show vertical scrollbar
-        self.image_listbox = Listbox(
+        self.image_listbox = DraggableListbox(
             self, selectmode="single", height=15, exportselection=False, font=("Arial", 12), background="#242424", foreground="#ffffff", activestyle="dotbox", selectbackground="#1f6aa5", selectforeground="#ffffff")
         self.scrollbar = ctk.CTkScrollbar(
             self, orientation="vertical", command=self.image_listbox.yview)
