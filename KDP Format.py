@@ -39,19 +39,15 @@ ctk.set_default_color_theme("blue")
 
 
 class DraggableListbox(Listbox):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, master, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.master = master  # Reference to the parent
         self.bind("<Button-1>", self.select_item)
         self.bind("<B1-Motion>", self.drag_item)
-
-        # Track the index of the item being moved
         self.dragged_index = None
 
     def select_item(self, event):
-        # Get the index of the item clicked
         self.dragged_index = self.nearest(event.y)
-        # Highlight the item
         self.selection_clear(0, ctk.END)
         self.selection_set(self.dragged_index)
 
@@ -59,26 +55,22 @@ class DraggableListbox(Listbox):
         if self.dragged_index is None:
             return
 
-        # Get the current target index
         target_index = self.nearest(event.y)
 
         if target_index != self.dragged_index:
-            # Swap the items
             dragged_text = self.get(self.dragged_index)
             target_text = self.get(target_index)
 
-            # Delete and insert at new positions
             self.delete(self.dragged_index)
             self.insert(self.dragged_index, target_text)
             self.delete(target_index)
             self.insert(target_index, dragged_text)
 
-            # Keep the dragged item highlighted
             self.selection_clear(0, ctk.END)
             self.selection_set(target_index)
 
-            # Update the dragged index to the new position
             self.dragged_index = target_index
+            self.master.update_image_files()  # Sync with `image_files`
 
 
 class ImageDocxApp(ctk.CTk):
@@ -294,22 +286,24 @@ class ImageDocxApp(ctk.CTk):
         # Load images from folder
         self.update_image_list()
 
+    def update_image_files(self):
+        self.image_files = list(
+            self.image_listbox.get(0, self.image_listbox.size()))
+
     def delete_item(self):
         selected_item_index = self.image_listbox.curselection()
         if selected_item_index:
-            selected_item_index = selected_item_index[0]  # Get the index
+            selected_item_index = selected_item_index[0]
             selected_item = self.image_listbox.get(selected_item_index)
-            # Store both item and index
             self.deleted_items.append((selected_item, selected_item_index))
             self.image_listbox.delete(selected_item_index)
+            self.update_image_files()  # Sync with `image_files`
 
     def undo_delete(self):
         if self.deleted_items:
-            # Get last deleted item and its index
             last_deleted_item, index = self.deleted_items.pop()
-            # Restore at the same position
             self.image_listbox.insert(index, last_deleted_item)
-            self.image_listbox.select_set(index)  # Restore selection
+            self.update_image_files()  # Sync with `image_files`
 
     def update_selection_view(self):
         # Get the index of the selected item
