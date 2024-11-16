@@ -58,17 +58,21 @@ class DraggableListbox(Listbox):
         target_index = self.nearest(event.y)
 
         if target_index != self.dragged_index:
+            # Store the item being dragged
             dragged_text = self.get(self.dragged_index)
-            target_text = self.get(target_index)
 
+            # Remove the dragged item from its original position
             self.delete(self.dragged_index)
-            self.insert(self.dragged_index, target_text)
-            self.delete(target_index)
-            self.insert(target_index, dragged_text)
 
-            self.selection_clear(0, ctk.END)
+            # Insert it at the new position
+            if target_index > self.dragged_index:
+                self.insert(target_index, dragged_text)
+            else:
+                self.insert(target_index, dragged_text)
+
+            # Update the selection and dragged index
+            self.selection_clear(0, "end")
             self.selection_set(target_index)
-
             self.dragged_index = target_index
             self.master.update_image_files()  # Sync with `image_files`
 
