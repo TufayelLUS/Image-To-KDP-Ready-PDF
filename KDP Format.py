@@ -121,6 +121,12 @@ class ImageDocxApp(ctk.CTk):
             self, text="Browse", command=self.select_folder, fg_color="#71198c")
         self.select_folder_btn.grid(row=0, column=2, padx=10, pady=(20, 5))
 
+        self.save_in_same_folder = ctk.BooleanVar(value=True)
+        self.save_in_same_folder_checkbox = ctk.CTkCheckBox(
+            self, text="Save In Same Folder", variable=self.save_in_same_folder)
+        self.save_in_same_folder_checkbox.grid(
+            row=0, column=4, padx=10, pady=(20, 5), sticky="w")
+
         # Output filename
         ctk.CTkLabel(self, text="Output File Name:").grid(
             row=2, column=0, padx=10, pady=5, sticky="w")
@@ -270,6 +276,10 @@ class ImageDocxApp(ctk.CTk):
             self, text="Move Page Down", command=self.move_down)
         self.down_button.grid(row=13, column=4, padx=5, pady=5)
 
+        self.duplicate_button = ctk.CTkButton(
+            self, text="Duplicate", command=self.duplicate_item, fg_color="#c76000")
+        self.duplicate_button.grid(row=11, column=4, padx=5, pady=5)
+
         # Preview window (New)
         self.preview_label = ctk.CTkLabel(self, text="Image Preview:")
         self.preview_label.grid(row=5, column=4, padx=10, pady=10)
@@ -289,6 +299,14 @@ class ImageDocxApp(ctk.CTk):
 
         # Load images from folder
         self.update_image_list()
+
+    def duplicate_item(self):
+        selected_item_index = self.image_listbox.curselection()
+        if selected_item_index:
+            selected_item_index = selected_item_index[0]
+            selected_item = self.image_listbox.get(selected_item_index)
+            self.image_listbox.insert(selected_item_index + 1, selected_item)
+            self.update_image_files()  # Sync with `image_files`
 
     def update_image_files(self):
         self.image_files = list(
@@ -330,6 +348,8 @@ class ImageDocxApp(ctk.CTk):
                         x.split(' ')[-1].split('.')[0].replace('-', '.')))
                 except:
                     pass
+                finally:
+                    self.save_config()
             self.update_image_list()
 
     def update_image_list(self):
@@ -473,8 +493,12 @@ class ImageDocxApp(ctk.CTk):
         # Flag to track if any valid images were added
         any_images_added = False
 
+        if self.save_in_same_folder.get():
+            target_folder = folder_path
+        else:
+            target_folder = "OUTPUT"
         # Create PDF using reportlab
-        pdf_file_path = os.path.join("OUTPUT", f"{output_name}.pdf")
+        pdf_file_path = os.path.join(target_folder, f"{output_name}.pdf")
         if os.path.exists(pdf_file_path):
             os.remove(pdf_file_path)
         pdf_canvas = canvas.Canvas(
@@ -513,16 +537,16 @@ class ImageDocxApp(ctk.CTk):
 
         # Save the document only if there are images added
         if any_images_added:
-            if os.path.exists(os.path.join("OUTPUT", output_name + '.docx')):
-                os.remove(os.path.join("OUTPUT", output_name + '.docx'))
-            doc.save(os.path.join("OUTPUT", output_name + '.docx'))
+            if os.path.exists(os.path.join(target_folder, output_name + '.docx')):
+                os.remove(os.path.join(target_folder, output_name + '.docx'))
+            doc.save(os.path.join(target_folder, output_name + '.docx'))
             pdf_canvas.save()
 
         if file_type == "PDF":
-            convert(os.path.join("OUTPUT", output_name + '.docx')
-                    ), os.path.join("OUTPUT", output_name + '.pdf')
+            convert(os.path.join(target_folder, output_name + '.docx')
+                    ), os.path.join(target_folder, output_name + '.pdf')
             if not self.keep_docx.get():
-                os.remove(os.path.join("OUTPUT", output_name + '.docx'))
+                os.remove(os.path.join(target_folder, output_name + '.docx'))
 
         messagebox.showinfo("Document Created Successfully!", f"Document saved as {
                             output_name}.{file_type.lower()}")
