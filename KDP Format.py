@@ -6,7 +6,6 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.shared import Inches
 from PIL import Image
-from docx2pdf import convert
 from reportlab.pdfgen import canvas
 from threading import Thread
 
@@ -532,6 +531,7 @@ class ImageDocxApp(ctk.CTk):
 
             pdf_canvas.drawImage(temp_image_path, 0, 0, width=int(
                 page_width.pt), height=int(page_height.pt))
+            pdf_canvas.showPage()
             any_images_added = True  # Mark that an image has been added
             os.remove(temp_image_path)
 
@@ -540,13 +540,12 @@ class ImageDocxApp(ctk.CTk):
             if os.path.exists(os.path.join(target_folder, output_name + '.docx')):
                 os.remove(os.path.join(target_folder, output_name + '.docx'))
             doc.save(os.path.join(target_folder, output_name + '.docx'))
-            pdf_canvas.save()
+            
 
-        if file_type == "PDF":
-            convert(os.path.join(target_folder, output_name + '.docx')
-                    ), os.path.join(target_folder, output_name + '.pdf')
-            if not self.keep_docx.get():
-                os.remove(os.path.join(target_folder, output_name + '.docx'))
+            if file_type == "PDF":
+                pdf_canvas.save()
+                if not self.keep_docx.get():
+                    os.remove(os.path.join(target_folder, output_name + '.docx'))
 
         messagebox.showinfo("Document Created Successfully!", f"Document saved as {
                             output_name}.{file_type.lower()}")

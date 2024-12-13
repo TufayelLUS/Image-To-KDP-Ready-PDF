@@ -1,12 +1,14 @@
 import sys
 from cx_Freeze import setup, Executable
 
+# pip install cx_freeze==7.2.4
+
 base = None
 
 if sys.platform == "win32":
     base = "Win32GUI"  # Use this option to create a GUI executable on Windows
 # set the name of the python script below
-executables = [Executable("KDP Format.py", base="Console", icon="icon.ico")]
+executables = [Executable("KDP Format.py", base=base, icon="icon.ico")]
 # if you want to show the console, use the line below instead and comment out the line above
 # executables = [Executable("python_file_name.py")]
 
