@@ -81,7 +81,7 @@ class ImageDocxApp(ctk.CTk):
         super().__init__()
 
         # Set window properties
-        self.title("KDP Auto Formatting Tool - For Sangi")
+        self.title("KDP Auto Formatting Tool")
         self.iconbitmap("icon.ico")
         self.geometry("1000x650")
         self.resizable(False, False)  # Make window non-resizable
