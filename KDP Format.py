@@ -41,41 +41,82 @@ ctk.set_default_color_theme("blue")
 
 class DraggableListbox(Listbox):
     def __init__(self, master, *args, **kwargs):
+        kwargs['selectmode'] = "extended"
         super().__init__(*args, **kwargs)
-        self.master = master  # Reference to the parent
-        self.bind("<Button-1>", self.select_item)
-        self.bind("<B1-Motion>", self.drag_item)
-        self.dragged_index = None
+        self.master = master
+        self.bind("<Button-1>", self.on_click)
+        self.bind("<B1-Motion>", self.on_drag)
+        self.start_index = None
+        self.selected_before_drag = []
 
-    def select_item(self, event):
-        self.dragged_index = self.nearest(event.y)
-        self.selection_clear(0, ctk.END)
-        self.selection_set(self.dragged_index)
+    def on_click(self, event):
+        clicked_index = self.nearest(event.y)
+        self.start_index = clicked_index
+        
+        # Store the current selection before any changes
+        self.selected_before_drag = list(self.curselection())
+        
+        # If the clicked item is not in the current selection and no modifiers are pressed,
+        # clear selection and select only the clicked item
+        if clicked_index not in self.selected_before_drag and not (event.state & 0x0004 or event.state & 0x0001):
+            self.selection_clear(0, 'end')
+            self.selection_set(clicked_index)
+            self.selected_before_drag = [clicked_index]
 
-    def drag_item(self, event):
-        if self.dragged_index is None:
+    def on_drag(self, event):
+        if self.start_index is None:
+            return
+            
+        current_index = self.nearest(event.y)
+        if current_index == self.start_index:
+            return
+            
+        # Use the selection that was active when we started dragging
+        selected_indices = self.selected_before_drag
+        if not selected_indices:
+            return
+            
+        # Don't allow drag to positions within the selection
+        if min(selected_indices) <= current_index <= max(selected_indices):
             return
 
-        target_index = self.nearest(event.y)
+        # Get all items to move
+        items_to_move = [self.get(i) for i in selected_indices]
+        
+        # Remove items from their current positions
+        for index in sorted(selected_indices, reverse=True):
+            self.delete(index)
+        
+        # Calculate new insertion position
+        num_items = len(items_to_move)
+        
+        if current_index > max(selected_indices):
+            # Moving down - adjust for items we removed
+            insert_index = current_index - num_items + 1
+        else:
+            # Moving up
+            insert_index = current_index
+        
+        # Insert items at new position
+        new_indices = []
+        for i, item in enumerate(items_to_move):
+            pos = insert_index + i
+            self.insert(pos, item)
+            new_indices.append(pos)
+        
+        # Update selection to new positions
+        self.selection_clear(0, 'end')
+        for idx in new_indices:
+            self.selection_set(idx)
+        
+        # Update the image files in the main app
+        self.master.update_image_files()
+        
+        # Update start index for continuous dragging
+        self.start_index = current_index
+        # Update the stored selection for the next drag operation
+        self.selected_before_drag = new_indices
 
-        if target_index != self.dragged_index:
-            # Store the item being dragged
-            dragged_text = self.get(self.dragged_index)
-
-            # Remove the dragged item from its original position
-            self.delete(self.dragged_index)
-
-            # Insert it at the new position
-            if target_index > self.dragged_index:
-                self.insert(target_index, dragged_text)
-            else:
-                self.insert(target_index, dragged_text)
-
-            # Update the selection and dragged index
-            self.selection_clear(0, "end")
-            self.selection_set(target_index)
-            self.dragged_index = target_index
-            self.master.update_image_files()  # Sync with `image_files`
 
 
 class ImageDocxApp(ctk.CTk):
@@ -254,7 +295,9 @@ class ImageDocxApp(ctk.CTk):
         # Image List Column (New)
         #  show vertical scrollbar
         self.image_listbox = DraggableListbox(
-            self, selectmode="single", height=15, exportselection=False, font=("Arial", 12), background="#343638", foreground="#ffffff", activestyle="dotbox", selectbackground="#1f6aa5", selectforeground="#ffffff")
+            self, selectmode="extended", height=15, exportselection=False, 
+            font=("Arial", 12), background="#343638", foreground="#ffffff", 
+            activestyle="dotbox", selectbackground="#1f6aa5", selectforeground="#ffffff")
         self.scrollbar = ctk.CTkScrollbar(
             self, orientation="vertical", command=self.image_listbox.yview)
         self.image_listbox.config(yscrollcommand=self.scrollbar.set)
@@ -391,11 +434,13 @@ class ImageDocxApp(ctk.CTk):
                 self.update_preview()
 
     def duplicate_item(self):
-        selected_item_index = self.image_listbox.curselection()
-        if selected_item_index:
-            selected_item_index = selected_item_index[0]
-            selected_item = self.image_listbox.get(selected_item_index)
-            self.image_listbox.insert(selected_item_index + 1, selected_item)
+        selected_indices = self.image_listbox.curselection()
+        if selected_indices:
+            # Sort in normal order to duplicate in sequence
+            for selected_index in sorted(selected_indices):
+                selected_item = self.image_listbox.get(selected_index)
+                # Insert duplicate right after the original
+                self.image_listbox.insert(selected_index + 1, selected_item)
             self.update_image_files()  # This now calls save_config automatically
 
     def update_image_files(self):
@@ -403,12 +448,13 @@ class ImageDocxApp(ctk.CTk):
         self.save_config()  # Save immediately after sequence change
 
     def delete_item(self):
-        selected_item_index = self.image_listbox.curselection()
-        if selected_item_index:
-            selected_item_index = selected_item_index[0]
-            selected_item = self.image_listbox.get(selected_item_index)
-            self.deleted_items.append((selected_item, selected_item_index))
-            self.image_listbox.delete(selected_item_index)
+        selected_indices = self.image_listbox.curselection()
+        if selected_indices:
+            # Sort in reverse order to delete from bottom to top
+            for selected_index in sorted(selected_indices, reverse=True):
+                selected_item = self.image_listbox.get(selected_index)
+                self.deleted_items.append((selected_item, selected_index))
+                self.image_listbox.delete(selected_index)
             self.update_image_files()  # This now calls save_config automatically
             self.save_deleted_items()  # Save deleted items immediately
 
@@ -487,22 +533,34 @@ class ImageDocxApp(ctk.CTk):
             self.preview_canvas.configure(image=self.preview_img)
 
     def move_up(self):
-        selection = self.image_listbox.curselection()
-        if selection and selection[0] > 0:
-            index = selection[0]
-            self.image_files[index], self.image_files[index -
-                                                    1] = self.image_files[index - 1], self.image_files[index]
-            self.update_listbox_selection(index - 1)
+        selected_indices = self.image_listbox.curselection()
+        if selected_indices and min(selected_indices) > 0:
+            # Move all selected items up
+            for index in sorted(selected_indices):
+                if index > 0:
+                    self.image_files[index], self.image_files[index-1] = self.image_files[index-1], self.image_files[index]
+            
+            self.update_image_list()
+            # Reselect the moved items (they all moved up by 1)
+            self.image_listbox.selection_clear(0, 'end')
+            for new_index in [i-1 for i in selected_indices]:
+                self.image_listbox.selection_set(new_index)
             self.update_selection_view()
             self.save_config()  # Save immediately after move
 
     def move_down(self):
-        selection = self.image_listbox.curselection()
-        if selection and selection[0] < len(self.image_files) - 1:
-            index = selection[0]
-            self.image_files[index], self.image_files[index +
-                                                    1] = self.image_files[index + 1], self.image_files[index]
-            self.update_listbox_selection(index + 1)
+        selected_indices = self.image_listbox.curselection()
+        if selected_indices and max(selected_indices) < len(self.image_files) - 1:
+            # Move all selected items down (from bottom to top)
+            for index in sorted(selected_indices, reverse=True):
+                if index < len(self.image_files) - 1:
+                    self.image_files[index], self.image_files[index+1] = self.image_files[index+1], self.image_files[index]
+            
+            self.update_image_list()
+            # Reselect the moved items (they all moved down by 1)
+            self.image_listbox.selection_clear(0, 'end')
+            for new_index in [i+1 for i in selected_indices]:
+                self.image_listbox.selection_set(new_index)
             self.update_selection_view()
             self.save_config()  # Save immediately after move
 
