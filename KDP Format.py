@@ -27,7 +27,9 @@ else:
         'bottom_margin': '0',
         'left_margin': '0',
         'right_margin': '0',
-        'gutter': '0'
+        'gutter': '0',
+        'image_sequence': '',
+        'deleted_items': ''
     }
     with open(config_file, 'w') as configfile:
         config.write(configfile)
@@ -83,7 +85,7 @@ class ImageDocxApp(ctk.CTk):
         # Set window properties
         self.title("KDP Auto Formatting Tool - For Sangi")
         self.iconbitmap("icon.ico")
-        self.geometry("1000x650")
+        self.geometry("1000x700")
         self.resizable(False, False)  # Make window non-resizable
 
         # Grid layout settings
@@ -245,6 +247,10 @@ class ImageDocxApp(ctk.CTk):
             self, text="Page Serial(Click to select):")
         self.image_listbox_label.grid(row=6, column=2, pady=10)
 
+        self.add_custom_image_btn = ctk.CTkButton(
+            self, text="Add Custom Image", command=self.add_custom_image, fg_color="#1f6aa5")
+        self.add_custom_image_btn.grid(row=7, column=2, padx=5, pady=5)
+
         # Image List Column (New)
         #  show vertical scrollbar
         self.image_listbox = DraggableListbox(
@@ -252,8 +258,8 @@ class ImageDocxApp(ctk.CTk):
         self.scrollbar = ctk.CTkScrollbar(
             self, orientation="vertical", command=self.image_listbox.yview)
         self.image_listbox.config(yscrollcommand=self.scrollbar.set)
-        self.image_listbox.grid(row=7, column=2, rowspan=5, pady=10)
-        self.scrollbar.grid(row=7, column=3, rowspan=5,
+        self.image_listbox.grid(row=8, column=2, rowspan=4, pady=10)
+        self.scrollbar.grid(row=8, column=3, rowspan=4,
                             pady=10, sticky="ns")
         self.image_listbox.bind("<<ListboxSelect>>", self.update_preview)
 
@@ -296,8 +302,93 @@ class ImageDocxApp(ctk.CTk):
             except:
                 pass
 
+        # Load image sequence from config if it exists
+        self.image_files = []
+        if 'image_sequence' in config['Settings'] and config['Settings']['image_sequence']:
+            saved_sequence = config['Settings']['image_sequence'].split('|')
+            folder_path = self.input_folder.get()
+            if os.path.exists(folder_path):
+                # Filter only files that exist in the folder
+                existing_files = [f for f in os.listdir(folder_path) if f.lower().endswith(
+                    ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))]
+                
+                # Load deleted items FIRST
+                self.deleted_items = []  # To store deleted items
+                if 'deleted_items' in config['Settings'] and config['Settings']['deleted_items']:
+                    deleted_data = config['Settings']['deleted_items'].split('|')
+                    for item_data in deleted_data:
+                        if item_data:
+                            try:
+                                filename, index_str = item_data.split(':', 1)
+                                index = int(index_str)
+                                self.deleted_items.append((filename, index))
+                            except:
+                                pass
+                
+                # Get list of deleted filenames for filtering
+                deleted_filenames = [filename for filename, index in self.deleted_items]
+                
+                # Filter saved sequence to exclude deleted items
+                self.image_files = [f for f in saved_sequence if f in existing_files and f not in deleted_filenames]
+                
+                # Add any new files that weren't in the saved sequence and aren't deleted
+                new_files = [f for f in existing_files if f not in self.image_files and f not in deleted_filenames]
+                self.image_files.extend(new_files)
+        else:
+            # Fallback to original loading method
+            folder_path = self.input_folder.get()
+            if os.path.exists(folder_path):
+                self.image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
+                    ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
+                try:
+                    self.image_files = sorted(self.image_files, key=lambda x: float(
+                        x.split(' ')[-1].split('.')[0].replace('-', '.')))
+                except:
+                    pass
+
         # Load images from folder
         self.update_image_list()
+
+    def add_custom_image(self):
+        file_paths = filedialog.askopenfilenames(
+            title="Select Custom Images",
+            filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif *.tiff")]
+        )
+        
+        if file_paths:
+            selection = self.image_listbox.curselection()
+            insert_index = selection[0] if selection else 0
+            
+            for file_path in file_paths:
+                filename = os.path.basename(file_path)
+                # Copy file to input folder
+                dest_path = os.path.join(self.input_folder.get(), filename)
+                
+                # Handle duplicate filenames
+                counter = 1
+                name, ext = os.path.splitext(filename)
+                while os.path.exists(dest_path):
+                    filename = f"{name}_{counter}{ext}"
+                    dest_path = os.path.join(self.input_folder.get(), filename)
+                    counter += 1
+                
+                # Copy the file
+                import shutil
+                shutil.copy2(file_path, dest_path)
+                
+                # Insert into listbox and image_files
+                self.image_listbox.insert(insert_index, filename)
+                self.image_files.insert(insert_index, filename)
+                insert_index += 1
+            
+            self.update_image_list()
+            self.save_config()  # Save immediately after adding images
+            
+            # Select the first added image
+            if selection:
+                self.image_listbox.select_clear(0, 'end')
+                self.image_listbox.select_set(selection[0])
+                self.update_preview()
 
     def duplicate_item(self):
         selected_item_index = self.image_listbox.curselection()
@@ -305,11 +396,11 @@ class ImageDocxApp(ctk.CTk):
             selected_item_index = selected_item_index[0]
             selected_item = self.image_listbox.get(selected_item_index)
             self.image_listbox.insert(selected_item_index + 1, selected_item)
-            self.update_image_files()  # Sync with `image_files`
+            self.update_image_files()  # This now calls save_config automatically
 
     def update_image_files(self):
-        self.image_files = list(
-            self.image_listbox.get(0, self.image_listbox.size()))
+        self.image_files = list(self.image_listbox.get(0, self.image_listbox.size()))
+        self.save_config()  # Save immediately after sequence change
 
     def delete_item(self):
         selected_item_index = self.image_listbox.curselection()
@@ -318,13 +409,21 @@ class ImageDocxApp(ctk.CTk):
             selected_item = self.image_listbox.get(selected_item_index)
             self.deleted_items.append((selected_item, selected_item_index))
             self.image_listbox.delete(selected_item_index)
-            self.update_image_files()  # Sync with `image_files`
+            self.update_image_files()  # This now calls save_config automatically
+            self.save_deleted_items()  # Save deleted items immediately
 
     def undo_delete(self):
         if self.deleted_items:
             last_deleted_item, index = self.deleted_items.pop()
             self.image_listbox.insert(index, last_deleted_item)
-            self.update_image_files()  # Sync with `image_files`
+            self.update_image_files()  # This now calls save_config automatically
+            self.save_deleted_items()  # Save deleted items immediately
+
+    def save_deleted_items(self):
+        # Convert deleted_items to string format: "filename:index|filename:index"
+        deleted_str = '|'.join([f"{filename}:{index}" for filename, index in self.deleted_items])
+        config['Settings']['deleted_items'] = deleted_str
+        self.save_config()
 
     def update_selection_view(self):
         # Get the index of the selected item
@@ -339,16 +438,32 @@ class ImageDocxApp(ctk.CTk):
         if folder_selected:
             self.input_folder.set(folder_selected)
             folder_path = self.input_folder.get()
+            
+            # Clear deleted items when changing folders
+            self.deleted_items = []
+            self.save_deleted_items()
+            
             if os.path.exists(folder_path):
-                self.image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
-                    ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
-                try:
-                    self.image_files = sorted(self.image_files, key=lambda x: float(
-                        x.split(' ')[-1].split('.')[0].replace('-', '.')))
-                except:
-                    pass
-                finally:
-                    self.save_config()
+                # Try to load saved sequence first
+                if 'image_sequence' in config['Settings'] and config['Settings']['image_sequence']:
+                    saved_sequence = config['Settings']['image_sequence'].split('|')
+                    existing_files = [f for f in os.listdir(folder_path) if f.lower().endswith(
+                        ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))]
+                    self.image_files = [f for f in saved_sequence if f in existing_files]
+                    
+                    # Add any new files that weren't in the saved sequence
+                    new_files = [f for f in existing_files if f not in self.image_files]
+                    self.image_files.extend(new_files)
+                else:
+                    # Fallback to original loading
+                    self.image_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith(
+                        ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff'))])
+                    try:
+                        self.image_files = sorted(self.image_files, key=lambda x: float(
+                            x.split(' ')[-1].split('.')[0].replace('-', '.')))
+                    except:
+                        pass
+                self.save_config()  # Save the updated sequence
             self.update_image_list()
 
     def update_image_list(self):
@@ -376,18 +491,20 @@ class ImageDocxApp(ctk.CTk):
         if selection and selection[0] > 0:
             index = selection[0]
             self.image_files[index], self.image_files[index -
-                                                      1] = self.image_files[index - 1], self.image_files[index]
+                                                    1] = self.image_files[index - 1], self.image_files[index]
             self.update_listbox_selection(index - 1)
             self.update_selection_view()
+            self.save_config()  # Save immediately after move
 
     def move_down(self):
         selection = self.image_listbox.curselection()
         if selection and selection[0] < len(self.image_files) - 1:
             index = selection[0]
             self.image_files[index], self.image_files[index +
-                                                      1] = self.image_files[index + 1], self.image_files[index]
+                                                    1] = self.image_files[index + 1], self.image_files[index]
             self.update_listbox_selection(index + 1)
             self.update_selection_view()
+            self.save_config()  # Save immediately after move
 
     def update_listbox_selection(self, new_index):
         self.update_image_list()
@@ -425,6 +542,11 @@ class ImageDocxApp(ctk.CTk):
         config['Settings']['left_margin'] = str(self.left_margin.get())
         config['Settings']['right_margin'] = str(self.right_margin.get())
         config['Settings']['gutter'] = str(self.gutter.get())
+        
+        # Save the current image sequence
+        config['Settings']['image_sequence'] = '|'.join(self.image_files)
+        
+        # Note: deleted_items is saved separately via save_deleted_items()
 
         with open(config_file, 'w') as configfile:
             config.write(configfile)
